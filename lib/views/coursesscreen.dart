@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:mytutor/views/cartscreen.dart';
 import 'package:mytutor/views/favoritescreen.dart';
 import 'package:mytutor/views/loginscreen.dart';
 import 'package:mytutor/views/mainscreen.dart';
@@ -11,6 +13,7 @@ import 'package:http/http.dart' as http;
 import '../constant.dart';
 import '../models/user.dart';
 import '../models/courses.dart';
+import '../models/cart.dart';
 
 class CoursesScreen extends StatefulWidget {
   final User user;
@@ -254,6 +257,14 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                           .subjectSessions
                                           .toString() +
                                           " time of sessions"),
+                                          Expanded(
+                                            flex: 3,
+                                            child: IconButton(
+                                                onPressed: () {
+                                                  _addtocartDialog(index);
+                                                },
+                                                icon: const Icon(
+                                                    Icons.shopping_cart))),
                                   ],
                               ))
                             ],
@@ -310,6 +321,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
           }
         });
   }
+
   void _loadSearchDialog() {
     showDialog(
         context: context,
@@ -352,4 +364,98 @@ class _CoursesScreenState extends State<CoursesScreen> {
           );
         });
   }
+
+    _loadOptions() {
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(20.0))),
+            title: const Text(
+              "Please select",
+              style: TextStyle(),
+            ),
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                ElevatedButton(onPressed: _onConfirm, child: const Text("Confirm")),
+                ElevatedButton(
+                    onPressed: _onCancel, child: const Text("Cancel")),
+              ],
+            ),
+          );
+        });
+  }
+
+  _addtocartDialog(int index) {
+      _addtoCart(index);
+  }
+
+  void _onConfirm() {
+    Navigator.push(
+        context, MaterialPageRoute(builder: (content) => const CartScreen(
+                          user: widget.user,
+                          totalpayable: widget.user
+                            )));
+  }
+
+  void _onCancel() {
+    Navigator.push(context,
+        MaterialPageRoute(builder: (content) => const LoginScreen()));
+  }
+
+  void _loadMyCart() {
+      http.post(
+          Uri.parse(
+              CONSTANTS.server + "/mytutor2/php/load_mycartqty.php"),
+          body: {
+            "email": widget.user.email.toString(),
+          }).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          return http.Response(
+              'Error', 408); // Request Timeout response status code
+        },
+      ).then((response) {
+        print(response.body);
+        var jsondata = jsonDecode(response.body);
+        if (response.statusCode == 200 && jsondata['status'] == 'success') {
+          print(jsondata['data']['carttotal'].toString());
+          setState(() {
+            widget.user.cart = jsondata['data']['carttotal'].toString();
+          });
+        }
+      });
+    
+  }
+
+  void _addtoCart(int index) {
+    http.post(
+        Uri.parse(CONSTANTS.server + "/mytutor2/php/insert_cart.php"),
+        body: {
+          "email": widget.user.email.toString(),
+          "subject_id": subjectList![index].subjectId.toString(),
+        }).timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        return http.Response(
+            'Error', 408); // Request Timeout response status code
+      },
+    ).then((response) {
+      print(response.body);
+      var jsondata = jsonDecode(response.body);
+      if (response.statusCode == 200 && jsondata['status'] == 'success') {
+        print(jsondata['data']['carttotal'].toString());
+        setState(() {
+          widget.user.cart = jsondata['data']['carttotal'].toString();
+        });
+        Fluttertoast.showToast(
+            msg: "Success",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            timeInSecForIosWeb: 1,
+            fontSize: 16.0);
+      }});
+}
 }
